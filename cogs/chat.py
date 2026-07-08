@@ -11,10 +11,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from google import genai
+from google.genai import errors as genai_errors
 
 log = logging.getLogger("bot.chat")
 
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-2.5-flash-lite"  # 免費額度比 gemini-2.5-flash 高，且額度是分開算的
 SYSTEM_PROMPT = (
     "你是一個活潑友善的 Discord 機器人助手，使用繁體中文回覆。"
     "回答盡量簡潔，避免不必要的長篇大論，除非使用者要求詳細說明。"
@@ -64,6 +65,12 @@ class Chat(commands.Cog):
         try:
             # google-genai 的 client 是同步的，丟到 thread 避免卡住 Discord 的事件迴圈
             response = await asyncio.to_thread(chat.send_message, user_text)
+        except genai_errors.ClientError as e:
+            if e.code == 429:
+                log.warning("Gemini 免費額度已用完：%s", e)
+                return "⏳ 今天的 AI 免費額度用完了，請明天再試，或稍後再試看看。"
+            log.exception("呼叫 Gemini API 失敗")
+            return "❌ 呼叫 AI 時發生錯誤，請稍後再試。"
         except Exception:
             log.exception("呼叫 Gemini API 失敗")
             return "❌ 呼叫 AI 時發生錯誤，請稍後再試。"
