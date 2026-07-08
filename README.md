@@ -57,24 +57,46 @@ git push -u origin main
 
 `.env` 已經被 `.gitignore` 排除，不會被上傳——金鑰不會外洩。
 
-## 5. 部署到 Render（讓機器人 24 小時在線）
+## 5. 部署到 Render（免費方案，讓機器人 24 小時在線）
 
-本機關機機器人就會離線，所以要部署到雲端。這個專案已經附上 `render.yaml`，用 Render 的 Blueprint 功能可以一次設定好：
+本機關機機器人就會離線，所以要部署到雲端。
+
+**重要：Render 免費方案不支援 Background Worker**（會出現 `service type is not available for this plan` 錯誤）。所以這個專案改用 **Web Service**——機器人額外起了一個極簡的 HTTP 健康檢查伺服器（`bot.py` 裡的 `start_health_server`），讓 Render 把它當成網頁服務來跑。代價是：Render 免費 Web Service 閒置 15 分鐘會自動休眠，所以要搭配免費的 UptimeRobot 定期 ping 喚醒它。
+
+### 5a. 部署到 Render
 
 1. 前往 [Render Dashboard](https://dashboard.render.com/) → 用 GitHub 帳號登入
 2. **New** → **Blueprint**
-3. 選擇這個 GitHub repo（`Discord-Bot`），Render 會自動讀取 `render.yaml`
+3. 選擇這個 GitHub repo（`Discord-Bot`），Render 會自動讀取 `render.yaml`（`type: web`）
 4. 部署設定頁會要求輸入兩個環境變數（因為標記了 `sync: false`，金鑰不會存進 repo）：
    - `DISCORD_TOKEN`
    - `GEMINI_API_KEY`
-5. 按下 **Apply** / **Deploy**，Render 會自動 `pip install -r requirements.txt` 然後執行 `python bot.py`
+5. 按下 **Apply** / **Deploy**
 6. 部署完成後到 **Logs** 分頁確認看到「已登入」字樣，代表機器人成功上線
+7. 記下 Render 給的網址（長得像 `https://discord-bot-xxxx.onrender.com`）
+
+> 如果你之前已經建立過一次失敗的 Background Worker 服務，那個服務要刪掉重建（Render 不能把既有服務的類型從 worker 改成 web），用上面的步驟重新走一次 Blueprint 部署即可。
+
+### 5b. 設定 UptimeRobot 保持喚醒
+
+1. 到 [uptimerobot.com](https://uptimerobot.com/) 免費註冊
+2. **Add New Monitor** → Monitor Type 選 **HTTP(s)**
+3. URL 貼上一步拿到的 Render 網址
+4. Monitoring Interval 設 **5 分鐘**
+5. 存檔——之後 UptimeRobot 會定期打你的網址，Render 就不會判定它閒置而休眠
+
+> 這個做法不是 100% 保證零中斷（偶爾重新部署或平台維護還是會有幾秒到幾分鐘的空檔），但日常使用完全沒問題，而且真的不用花錢。
 
 之後每次 `git push` 到 `main`，Render 會自動重新部署最新版本。
 
 > 記得部署後把本機執行中的 `python bot.py` 關掉，同一個 Token 兩邊同時跑，Discord 上每個指令都會回覆兩次。
 
-其他選項：[Railway](https://railway.app)（連接 GitHub repo 也很直覺）、自己的 VPS + `systemd`/`pm2` 常駐執行。
+### 其他選項
+
+- **付費方案**：把 `render.yaml` 的 `plan: free` 改成 `starter`（或其他付費方案），且不需要 UptimeRobot 保活技巧，`type: web` 或改回 `type: worker` 皆可，最省心但要花錢
+- [Railway](https://railway.app)：連接 GitHub repo 也很直覺，但只有一次性 $5 試用額度，之後需要 Hobby 方案（$5/月起）
+- Oracle Cloud「Always Free」VM：真正永久免費，但需要自己 SSH 進去設定 `systemd` 常駐執行，設定較複雜
+- 自己的 VPS + `systemd`/`pm2` 常駐執行
 
 ## 專案結構
 

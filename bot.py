@@ -1,12 +1,18 @@
 """Discord 機器人主程式。
 
 啟動流程：載入環境變數 → 建立 Bot → 載入 cogs → 同步斜線指令。
+
+同時起一個極簡的 HTTP 健康檢查伺服器：Render 免費方案只支援 Web Service
+（不支援常駐的 Background Worker），Web Service 需要綁 port 才會被判定為存活；
+另外配合 UptimeRobot 之類的服務定期 ping 這個網址，可以避免 Render 15 分鐘
+無活動就休眠。
 """
 import asyncio
 import logging
 import os
 
 import discord
+from aiohttp import web
 from discord.ext import commands
 from dotenv import load_dotenv
 
@@ -44,6 +50,20 @@ async def on_app_command_error(interaction: discord.Interaction, error: discord.
     log.exception("斜線指令發生未預期錯誤", exc_info=error)
 
 
+async def start_health_server():
+    async def health(_request):
+        return web.Response(text="Bot is running.")
+
+    app = web.Application()
+    app.router.add_get("/", health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", 8080))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    log.info("健康檢查伺服器已啟動，port=%d", port)
+
+
 async def main():
     token = os.getenv("DISCORD_TOKEN")
     if not token:
@@ -53,6 +73,7 @@ async def main():
         for cog in COGS:
             await bot.load_extension(cog)
             log.info("已載入 %s", cog)
+        await start_health_server()
         await bot.start(token)
 
 
