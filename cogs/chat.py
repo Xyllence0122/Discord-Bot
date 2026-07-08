@@ -27,7 +27,9 @@ class Chat(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         api_key = os.getenv("GEMINI_API_KEY")
-        self.client = genai.Client(api_key=api_key) if api_key else None
+        # 明確指定 vertexai=False，強制走 Gemini Developer API 的 API Key 認證，
+        # 避免 SDK 依環境變數自動判斷成 Vertex AI 的 OAuth 認證模式（那樣會 401）
+        self.client = genai.Client(api_key=api_key, vertexai=False) if api_key else None
         # 每個頻道各自一個 chat session，物件本身會記住對話歷史
         self.chats: dict[int, "genai.chats.Chat"] = {}
         # 最近處理過的訊息 ID，防止同一則訊息被處理兩次
