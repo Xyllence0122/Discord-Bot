@@ -13,7 +13,7 @@ from google import genai
 
 log = logging.getLogger("bot.chat")
 
-MODEL = "gemini-3.5-flash"
+MODEL = "gemini-2.5-flash"
 SYSTEM_PROMPT = (
     "你是一個活潑友善的 Discord 機器人助手，使用繁體中文回覆。"
     "回答盡量簡潔，避免不必要的長篇大論，除非使用者要求詳細說明。"
@@ -26,31 +26,32 @@ class Chat(commands.Cog):
         self.bot = bot
         api_key = os.getenv("GEMINI_API_KEY")
         self.client = genai.Client(api_key=api_key) if api_key else None
-        # 每個頻道記住最後一次的 interaction id，讓 Gemini 伺服器端串接對話歷史
-        self.last_interaction_id: dict[int, str] = {}
+        # 每個頻道各自一個 chat session，物件本身會記住對話歷史
+        self.chats: dict[int, "genai.chats.Chat"] = {}
+
+    def _get_chat(self, channel_id: int):
+        chat = self.chats.get(channel_id)
+        if chat is None:
+            chat = self.client.chats.create(
+                model=MODEL,
+                config={"system_instruction": SYSTEM_PROMPT},
+            )
+            self.chats[channel_id] = chat
+        return chat
 
     async def _ask_gemini(self, channel_id: int, user_text: str) -> str:
         if self.client is None:
             return "⚠️ 尚未設定 GEMINI_API_KEY，AI 聊天功能無法使用。"
 
-        kwargs = {
-            "model": MODEL,
-            "input": user_text,
-            "system_instruction": SYSTEM_PROMPT,
-        }
-        prev_id = self.last_interaction_id.get(channel_id)
-        if prev_id:
-            kwargs["previous_interaction_id"] = prev_id
-
+        chat = self._get_chat(channel_id)
         try:
             # google-genai 的 client 是同步的，丟到 thread 避免卡住 Discord 的事件迴圈
-            interaction = await asyncio.to_thread(self.client.interactions.create, **kwargs)
+            response = await asyncio.to_thread(chat.send_message, user_text)
         except Exception:
             log.exception("呼叫 Gemini API 失敗")
             return "❌ 呼叫 AI 時發生錯誤，請稍後再試。"
 
-        self.last_interaction_id[channel_id] = interaction.id
-        return interaction.output_text or "（沒有收到回覆內容）"
+        return response.text or "（沒有收到回覆內容）"
 
     @staticmethod
     def _strip_mention(content: str, bot_user: discord.ClientUser) -> str:
@@ -79,7 +80,7 @@ class Chat(commands.Cog):
 
     @app_commands.command(name="reset_chat", description="清除這個頻道跟 AI 的對話記憶")
     async def reset_chat(self, interaction: discord.Interaction):
-        self.last_interaction_id.pop(interaction.channel_id, None)
+        self.chats.pop(interaction.channel_id, None)
         await interaction.response.send_message("🧹 對話記憶已清除。", ephemeral=True)
 
     @staticmethod
