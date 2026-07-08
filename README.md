@@ -4,7 +4,7 @@
 
 - 基本指令：`/ping`、`/roll`（擲骰子）、`/coinflip`、`/8ball`
 - 伺服器/使用者資訊：`/userinfo`、`/serverinfo`
-- AI 聊天：`@機器人` 直接聊天，或用 `/ask` 問問題（透過 Claude API，含頻道對話記憶）、`/reset_chat` 清除記憶
+- AI 聊天：`@機器人` 直接聊天，或用 `/ask` 問問題（透過 Gemini API 免費額度，含頻道對話記憶）、`/reset_chat` 清除記憶
 
 ## 1. 建立 Discord Bot
 
@@ -34,7 +34,7 @@ copy .env.example .env       # Windows；macOS/Linux 用 cp
 編輯 `.env`，填入：
 
 - `DISCORD_TOKEN`：上面拿到的 Bot Token
-- `ANTHROPIC_API_KEY`：[Anthropic Console](https://console.anthropic.com/) 申請的 API Key（不需要 AI 聊天功能可留空，其他指令仍可正常運作）
+- `GEMINI_API_KEY`：[Google AI Studio](https://aistudio.google.com/apikey) 申請的免費 API Key，不需要信用卡（不需要 AI 聊天功能可留空，其他指令仍可正常運作）
 
 ## 3. 執行
 
@@ -66,7 +66,7 @@ git push -u origin main
 3. 選擇這個 GitHub repo（`Discord-Bot`），Render 會自動讀取 `render.yaml`
 4. 部署設定頁會要求輸入兩個環境變數（因為標記了 `sync: false`，金鑰不會存進 repo）：
    - `DISCORD_TOKEN`
-   - `ANTHROPIC_API_KEY`
+   - `GEMINI_API_KEY`
 5. 按下 **Apply** / **Deploy**，Render 會自動 `pip install -r requirements.txt` 然後執行 `python bot.py`
 6. 部署完成後到 **Logs** 分頁確認看到「已登入」字樣，代表機器人成功上線
 
@@ -83,7 +83,7 @@ discord-bot/
 ├── bot.py              # 進入點：載入 cogs、連線 Discord
 ├── cogs/
 │   ├── fun.py          # 基本指令與娛樂功能
-│   └── chat.py         # AI 聊天（Claude API）
+│   └── chat.py         # AI 聊天（Gemini API 免費額度）
 ├── requirements.txt
 ├── .env.example
 └── .gitignore
