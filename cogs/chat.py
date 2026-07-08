@@ -5,6 +5,7 @@
 import asyncio
 import logging
 import os
+from collections import deque
 
 import discord
 from discord import app_commands
@@ -19,6 +20,7 @@ SYSTEM_PROMPT = (
     "回答盡量簡潔，避免不必要的長篇大論，除非使用者要求詳細說明。"
 )
 DISCORD_MSG_LIMIT = 2000
+SEEN_MESSAGE_LIMIT = 200  # 避免 Discord gateway 重連時重複送達同一則訊息造成重複回覆
 
 
 class Chat(commands.Cog):
@@ -28,6 +30,19 @@ class Chat(commands.Cog):
         self.client = genai.Client(api_key=api_key) if api_key else None
         # 每個頻道各自一個 chat session，物件本身會記住對話歷史
         self.chats: dict[int, "genai.chats.Chat"] = {}
+        # 最近處理過的訊息 ID，防止同一則訊息被處理兩次
+        self._seen_message_ids: deque[int] = deque(maxlen=SEEN_MESSAGE_LIMIT)
+        self._seen_message_id_set: set[int] = set()
+
+    def _already_seen(self, message_id: int) -> bool:
+        if message_id in self._seen_message_id_set:
+            return True
+        if len(self._seen_message_ids) == self._seen_message_ids.maxlen:
+            oldest = self._seen_message_ids.popleft()
+            self._seen_message_id_set.discard(oldest)
+        self._seen_message_ids.append(message_id)
+        self._seen_message_id_set.add(message_id)
+        return False
 
     def _get_chat(self, channel_id: int):
         chat = self.chats.get(channel_id)
@@ -60,6 +75,9 @@ class Chat(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot or self.bot.user not in message.mentions:
+            return
+        if self._already_seen(message.id):
+            log.warning("忽略重複送達的訊息事件：message.id=%s", message.id)
             return
 
         user_text = self._strip_mention(message.content, self.bot.user)
