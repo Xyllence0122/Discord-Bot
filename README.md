@@ -57,13 +57,24 @@ git push -u origin main
 
 `.env` 已經被 `.gitignore` 排除，不會被上傳——金鑰不會外洩。
 
-## 5. 部署（讓機器人 24 小時在線）
+## 5. 部署到 Render（讓機器人 24 小時在線）
 
-本機關機機器人就會離線。免費/低成本的持續運行方案：
+本機關機機器人就會離線，所以要部署到雲端。這個專案已經附上 `render.yaml`，用 Render 的 Blueprint 功能可以一次設定好：
 
-- [Railway](https://railway.app)：連接 GitHub repo，設定環境變數，自動部署
-- [Render](https://render.com)：Background Worker 服務
-- 自己的 VPS + `systemd` 或 `pm2` 常駐執行
+1. 前往 [Render Dashboard](https://dashboard.render.com/) → 用 GitHub 帳號登入
+2. **New** → **Blueprint**
+3. 選擇這個 GitHub repo（`Discord-Bot`），Render 會自動讀取 `render.yaml`
+4. 部署設定頁會要求輸入兩個環境變數（因為標記了 `sync: false`，金鑰不會存進 repo）：
+   - `DISCORD_TOKEN`
+   - `ANTHROPIC_API_KEY`
+5. 按下 **Apply** / **Deploy**，Render 會自動 `pip install -r requirements.txt` 然後執行 `python bot.py`
+6. 部署完成後到 **Logs** 分頁確認看到「已登入」字樣，代表機器人成功上線
+
+之後每次 `git push` 到 `main`，Render 會自動重新部署最新版本。
+
+> 記得部署後把本機執行中的 `python bot.py` 關掉，同一個 Token 兩邊同時跑，Discord 上每個指令都會回覆兩次。
+
+其他選項：[Railway](https://railway.app)（連接 GitHub repo 也很直覺）、自己的 VPS + `systemd`/`pm2` 常駐執行。
 
 ## 專案結構
 

@@ -33,6 +33,17 @@ async def on_ready():
     log.info("已同步 %d 個斜線指令", len(synced))
 
 
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+    # interaction token 在極少數網路延遲下會過期（Discord 3 秒回應限制），
+    # 這種情況已經沒有互動可以回覆了，記錄下來就好，不用當成程式錯誤處理
+    original = getattr(error, "original", error)
+    if isinstance(original, discord.NotFound):
+        log.warning("Interaction 已過期，忽略：%s", original)
+        return
+    log.exception("斜線指令發生未預期錯誤", exc_info=error)
+
+
 async def main():
     token = os.getenv("DISCORD_TOKEN")
     if not token:
